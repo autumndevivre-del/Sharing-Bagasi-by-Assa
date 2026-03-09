@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator Ongkir Bagasi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  h1 { font-size: 20px; font-weight: 700; color: #111; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+  .tab {
+    padding: 11px; border-radius: 10px; border: 1.5px solid #e0e0e0;
+    background: white; font-size: 13px; font-weight: 600; color: #555;
+    cursor: pointer; transition: all 0.18s; text-align: center; font-family: inherit;
+  }
+  .tab.active { background: #111; color: white; border-color: #111; }
+  .field-label { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 8px; }
+  .input-wrap {
+    border: 1.5px solid #e0e0e0; border-radius: 10px; overflow: hidden;
+    display: flex; align-items: center; margin-bottom: 6px; transition: border-color 0.18s;
+  }
+  .input-wrap:focus-within { border-color: #111; }
+  input[type="number"] {
+    flex: 1; border: none; outline: none; padding: 13px 16px;
+    font-size: 16px; font-weight: 500; color: #111; font-family: inherit;
+  }
+  .input-unit {
+    padding: 0 14px; font-size: 13px; color: #aaa; font-weight: 500;
+    border-left: 1.5px solid #e0e0e0; height: 48px; display: flex; align-items: center;
+  }
+  .hint { font-size: 12px; color: #aaa; margin-bottom: 20px; }
+  .btn {
+    width: 100%; padding: 15px; background: #111; color: white; border: none;
+    border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.18s; font-family: inherit;
+  }
+  .btn:hover { opacity: 0.85; }
+  .result { display: none; margin-top: 20px; background: #f7f7f7; border-radius: 12px; padding: 20px; }
+  .result.show { display: block; }
+  .result-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #aaa; margin-bottom: 16px;
+  }
+  .result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px; color: #444; margin-bottom: 10px;
+  }
+  .badge {
+    background: #111; color: white; border-radius: 20px;
+    padding: 4px 10px; font-size: 12px; font-weight: 600;
+  }
+  .divider { height: 1px; background: #e8e8e8; margin: 14px 0; }
+  .calc-row { display: flex; justify-content: space-between; font-size: 14px; color: #444; margin-bottom: 12px; }
+  .total-row { display: flex; justify-content: space-between; align-items: center; }
+  .total-label { font-size: 15px; font-weight: 700; color: #111; }
+  .total-price { font-size: 18px; font-weight: 800; color: #111; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Kalkulator Ongkir</h1>
+  <p class="subtitle">Hitung biaya pengiriman Indonesia ↔ Bangkok</p>
+  <div class="tabs">
+    <button class="tab active" id="tab-ina" onclick="setRoute('ina')">🇮🇩 → 🇹🇭 Bangkok</button>
+    <button class="tab" id="tab-bkk" onclick="setRoute('bkk')">🇹🇭 → 🇮🇩 Indonesia</button>
+  </div>
+  <div class="field-label">Berat Barang (gram)</div>
+  <div class="input-wrap">
+    <input type="number" id="weight" placeholder="0" min="1">
+    <span class="input-unit">gram</span>
+  </div>
+  <p class="hint">Pembulatan otomatis per 500 gram ke atas</p>
+  <button class="btn" onclick="calculate()">Hitung Ongkir</button>
+  <div class="result" id="result">
+    <div class="result-title">Rincian Biaya</div>
+    <div class="result-row"><span>Rute</span><span class="badge" id="res-route">INA → BKK</span></div>
+    <div class="result-row"><span>Berat input</span><span id="res-input">—</span></div>
+    <div class="result-row"><span>Ditagih sebagai</span><span id="res-charged"><strong>—</strong></span></div>
+    <div class="divider"></div>
+    <div class="calc-row"><span id="res-formula">—</span><span id="res-subtotal">—</span></div>
+    <div class="total-row">
+      <span class="total-label">Total Ongkir</span>
+      <span class="total-price" id="res-total">—</span>
+    </div>
+  </div>
+</div>
+<script>
+  let route = 'ina';
+  const RATES = { ina: { kg: 85000, half: 50000 }, bkk: { kg: 100000, half: 65000 } };
+
+  function setRoute(r) {
+    route = r;
+    document.getElementById('tab-ina').className = 'tab' + (r === 'ina' ? ' active' : '');
+    document.getElementById('tab-bkk').className = 'tab' + (r === 'bkk' ? ' active' : '');
+    document.getElementById('result').classList.remove('show');
+  }
+
+  function roundWeight(grams) {
+    const kg = Math.floor(grams / 1000);
+    const rem = grams % 1000;
+    if (rem === 0) return { kg, half: 0 };
+    if (rem <= 799) return { kg, half: 1 };
+    return { kg: kg + 1, half: 0 };
+  }
+
+  function fmtRupiah(n) { return 'Rp' + n.toLocaleString('id-ID'); }
+
+  function calculate() {
+    const grams = parseInt(document.getElementById('weight').value);
+    if (!grams || grams <= 0) { document.getElementById('weight').focus(); return; }
+    const rate = RATES[route];
+    const { kg, half } = roundWeight(grams);
+    let price, chargedLabel, formula;
+    if (kg === 0 && half === 1) {
+      chargedLabel = '500 gr'; formula = '500 gr × ' + fmtRupiah(rate.half); price = rate.half;
+    } else if (half === 0) {
+      chargedLabel = kg + ' kg'; formula = kg + ' kg × ' + fmtRupiah(rate.kg); price = kg * rate.kg;
+    } else {
+      chargedLabel = kg + ' kg + 500 gr';
+      formula = kg + ' kg × ' + fmtRupiah(rate.kg) + ' + 500 gr × ' + fmtRupiah(rate.half);
+      price = kg * rate.kg + rate.half;
+    }
+    document.getElementById('res-route').textContent = route === 'ina' ? 'INA → BKK' : 'BKK → INA';
+    document.getElementById('res-input').textContent = grams.toLocaleString('id-ID') + ' gr';
+    document.getElementById('res-charged').innerHTML = '<strong>' + chargedLabel + '</strong>';
+    document.getElementById('res-formula').textContent = formula;
+    document.getElementById('res-subtotal').textContent = fmtRupiah(price);
+    document.getElementById('res-total').textContent = fmtRupiah(price);
+    document.getElementById('result').classList.add('show');
+  }
+
+  document.getElementById('weight').addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+</script>
+</body>
+</html>
